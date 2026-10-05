@@ -1,0 +1,735 @@
+import type {
+  AssignmentFilter,
+  AssignmentStatus,
+  AssignmentView,
+  Candidate,
+  Degree,
+  Education,
+  ForeignFilter,
+  GaishiScore,
+  Gender,
+  Industry,
+  Jlpt,
+  Level,
+  Major,
+  MeetingType,
+  OverseasFilter,
+  Position,
+  ProgressStep,
+  Qualification,
+  ReassignReason,
+  SchoolRating,
+  Seniority,
+  TeamId,
+} from '../types';
+import { fmtGpa, fmtNum, scoreSpan, splitIso, splitStamp } from './format';
+
+/**
+ * Every UI label lives here (English) and in ja.ts (Japanese, loaded on demand). Components never hard-code text.
+ * Candidate data (names, job titles, companies, schools) is shown as stored.
+ */
+
+const MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
+
+const WEEKDAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+export const en = {
+  appName: 'Resume Finder',
+  brandTop: 'Robert—',
+  brandBottom: '—Walters',
+  brandLabel: 'Robert Walters',
+  /** The search page is listed under the product name, Resume Finder. */
+  nav: {
+    search: 'Resume Finder',
+    upload: 'Upload Resume',
+    dashboard: 'Dashboard',
+    assignment: 'Assignment',
+    analytics: 'Analytics',
+    admin: 'Admin',
+  },
+  /** Shorter labels for the phone tab strip. */
+  navShort: {
+    search: 'Resume Finder',
+    upload: 'Upload',
+    dashboard: 'Dashboard',
+    assignment: 'Assignment',
+    analytics: 'Analytics',
+    admin: 'Admin',
+  },
+  homeLabel: 'Robert Walters, Resume Finder home',
+  mainNav: 'Main',
+  signOut: 'Sign out',
+  language: 'Language',
+  darkMode: 'Dark mode',
+  switchToLight: 'Switch to light mode',
+  switchToDark: 'Switch to dark mode',
+  savedSearches: 'Saved searches',
+  savedShort: 'Saved',
+  noSavedSearches: 'No saved searches yet. Use “Save search” to keep one.',
+  deleteSaved: (name: string) => `Delete “${name}”`,
+  searchesInRow: (n: number) => `${n} searches in a row`,
+
+  pageTitle: 'Find candidates',
+  pageSub: 'Tick what the role needs. The count updates with every click.',
+  filtersLabel: 'Search filters',
+
+  jdTitle: 'Start from a job description',
+  jdLabel: 'Job description',
+  jdPlaceholder: 'Paste a job description here, then press “Fill filters from this text”.',
+  jdFill: 'Fill filters from this text',
+  jdExample: 'Use an example',
+  jdFilled: (n: number) =>
+    n === 1 ? '1 filter filled. Check it and fix it if it is wrong.' : `${n} filters filled. Check them and fix any that are wrong.`,
+  jdNone: 'No filters found in this text. Tick them below instead.',
+  jdEmpty: 'Paste a job description first.',
+
+  rowName: 'Name',
+  lastName: 'Last name',
+  firstName: 'First name',
+  rowCompany: 'Company',
+  currentCompany: 'Current company',
+  previousCompany: 'Previous company',
+  addPrevious: 'Add another previous company',
+  removePrevious: 'Remove this previous company',
+
+  rowAge: 'Age',
+  decade: (d: number) => `${d}s`,
+  anyAge: 'Any age',
+  ageRange: (a: number, b: number) => `Ages ${a} to ${b}`,
+  ageMinLabel: 'Youngest age',
+  ageMaxLabel: 'Oldest age',
+
+  rowGender: 'Gender',
+  gender: { male: 'Male', female: 'Female', not_stated: 'Not stated' } as Record<Gender, string>,
+
+  rowSeniority: 'Seniority',
+  seniorityButton: { S: 'Staff', 'S+': 'Senior staff', K: 'Kachō, manager', B: 'Buchō, department head', Y: 'Yakuin, executive' } as Record<
+    Seniority,
+    string
+  >,
+  seniorityShort: { S: 'Staff', 'S+': 'Senior staff', K: 'Kachō', B: 'Buchō', Y: 'Yakuin' } as Record<Seniority, string>,
+  seniorityFact: (s: Seniority) => `${en.seniorityShort[s]} (${s})`,
+
+  rowIndustry: 'Industry',
+  industry: {
+    technology: 'Technology',
+    financial: 'Financial services',
+    healthcare: 'Healthcare and pharma',
+    manufacturing: 'Manufacturing',
+    consumer: 'Consumer and retail',
+    telecoms: 'Telecoms',
+    professional: 'Professional services',
+    energy: 'Energy and infrastructure',
+  } as Record<Industry, string>,
+  rowPosition: 'Position',
+  position: {
+    sales: 'Sales',
+    marketing: 'Marketing',
+    finance: 'Finance and accounting',
+    hr: 'Human resources',
+    it: 'IT and engineering',
+    legal: 'Legal and compliance',
+    supply: 'Supply chain',
+    gm: 'General management',
+  } as Record<Position, string>,
+
+  rowGaishi: 'Gaishi',
+  gaishiSub: 'Fit for foreign-affiliated companies',
+  gaishiScore: 'Gaishi score',
+  gaishiHelp: 'A is the strongest. Made up of English, foreign companies and time overseas (below).',
+  /** Live hint under the score: what the sub-filters below mean for the score. */
+  gaishiHint: {
+    any: 'Sub-filters set to Any = every score, A to D',
+    match: (s: GaishiScore[]) => `These settings match score ${scoreSpan(s, 'or', 'to')}`,
+    conflict: (s: GaishiScore[]) => `These settings only match score ${scoreSpan(s, 'or', 'to')}: no one has the score you ticked`,
+  },
+  foreignLabel: 'Worked at a foreign company',
+  foreign: { any: 'Any', never: 'Never', once: 'At least once', twice: 'Twice or more' } as Record<ForeignFilter, string>,
+  englishLevel: 'English level',
+  japaneseLevel: 'Japanese level',
+  /** Small helper under the level buttons: a level filters as "this level or higher". */
+  orHigher: 'or higher',
+  toeicLabel: 'TOEIC score',
+  toeicPlaceholder: 'TOEIC',
+  toeicIs: (n: number, l: Level) => `TOEIC ${n} = ${en.level[l]}`,
+  jlptLabel: 'JLPT',
+  jlptIs: (n: Jlpt, l: Level) => `JLPT ${n} = ${en.level[l]}`,
+  jlptNative: 'Native speakers = Native',
+  any: 'Any',
+  level: { Basic: 'Basic', Conversational: 'Conversational', Business: 'Business', Fluent: 'Fluent', Native: 'Native' } as Record<
+    Level,
+    string
+  >,
+  overseasLabel: 'Lived overseas',
+  overseas: { any: 'Any', yes: 'Yes', no: 'No' } as Record<OverseasFilter, string>,
+
+  rowEducation: 'Education',
+  degreeLabel: 'Degree',
+  degree: { "Bachelor's": "Bachelor's", "Master's": "Master's", MBA: 'MBA', PhD: 'PhD' } as Record<Degree, string>,
+  majorFor: (d: Degree) => `Major for ${en.degree[d]}`,
+  anyMajor: 'Any major',
+  schoolRatingLabel: 'School rating',
+  schoolRating: { S: 'S', A: 'A', B: 'B', C: 'C', Overseas: 'Overseas' } as Record<SchoolRating, string>,
+  /** The (i) glossary beside School rating. */
+  ratingInfo: 'What the school ratings mean',
+  ratingGlossary: {
+    S: 'Top national and elite universities (e.g. Univ. of Tokyo, Kyoto, Keio, Waseda)',
+    A: 'Strong universities (e.g. Osaka, Nagoya, Tohoku, Hitotsubashi)',
+    B: 'Solid universities',
+    C: 'Other universities',
+    Overseas: 'Schools outside Japan',
+  } as Record<SchoolRating, string>,
+  ratingSample: 'Sample list, to be confirmed by Robert Walters.',
+  gpaLabel: 'GPA / score',
+  gpaSlider: 'Minimum GPA, on a 4.0 scale',
+  gpaBox: 'Minimum GPA',
+  gpaHelp: 'or higher, out of 4.0',
+  qualLabel: 'Other qualifications',
+  qualification: {
+    cpa: 'CPA',
+    uscpa: 'USCPA',
+    cfa: 'CFA',
+    pmp: 'PMP',
+    cia: 'CIA',
+    bookkeeping: 'Bookkeeping',
+    itcert: 'IT cert. (AWS/Azure)',
+    bengoshi: 'Lawyer (Bengoshi)',
+    sharoushi: 'Sharoushi',
+  } as Record<Qualification, string>,
+  qualificationFull: {
+    cpa: 'Certified Public Accountant (CPA)',
+    uscpa: 'US Certified Public Accountant (USCPA)',
+    cfa: 'Chartered Financial Analyst (CFA)',
+    pmp: 'Project Management Professional (PMP)',
+    cia: 'Certified Internal Auditor (CIA)',
+    bookkeeping: 'Bookkeeping (Boki)',
+    itcert: 'IT certifications (AWS/Azure)',
+    bengoshi: 'Lawyer (Bengoshi)',
+    sharoushi: 'Labour and social security attorney (Sharoushi)',
+  } as Record<Qualification, string>,
+  qualOther: 'Other qualification',
+  qualOtherPlaceholder: 'Other…',
+  majorLabel: 'Major',
+  major: {
+    business: 'Business and economics',
+    engineering: 'Engineering',
+    science: 'Science',
+    law: 'Law and politics',
+    humanities: 'Humanities',
+    infosci: 'Information science',
+  } as Record<Major, string>,
+  schoolName: 'School name',
+
+  countMatch: 'candidates match',
+  ofDatabase: (n: string) => `of ${n} in the database`,
+  ofCurrent: (n: string) => `of ${n} in the current results`,
+  ofShort: (n: string) => `of ${n}`,
+  showN: (n: number) => (n === 1 ? 'Show 1 candidate' : `Show ${fmtNum(n)} candidates`),
+  saveSearch: 'Save search',
+  clearAll: 'Clear all filters',
+  activeFilters: 'Active filters',
+  sections: { candidate: 'Candidate', role: 'Role', gaishi: 'Gaishi fit', education: 'Education' },
+  nSelected: (n: number) => `${n} selected`,
+  filtersButton: (n: number) => (n ? `Filters (${n})` : 'Filters'),
+  filtersTitle: 'Filters',
+  resultsLabel: 'Results',
+  ofInSearch: (n: string, k: number) => `of ${n} in search ${k}`,
+  closeCv: 'Close CV',
+  noActive: 'Nothing ticked yet. Every candidate matches.',
+  removeChip: (label: string) => `Remove ${label}`,
+  zero: 'No candidates match. Remove a filter to widen the search.',
+
+  resultsTitle: (n: number) => (n === 1 ? '1 candidate' : `${fmtNum(n)} candidates`),
+  searchWithin: 'Search within these results',
+  /** Phone label for the same button. */
+  searchWithinShort: 'Search within',
+  editFilters: 'Edit filters',
+  newSearch: 'New search',
+  trailLabel: 'Search steps',
+  allCandidates: 'All candidates',
+  searchN: (n: number) => `Search ${n}`,
+  searchingWithin: (n: number, k: number) => `Searching within the ${fmtNum(n)} candidates from search ${k}.`,
+  editingSearch: (k: number) => `Editing search ${k}.`,
+  backToResults: 'Back to results',
+  sortBy: 'Sort by',
+  sortBest: 'Best CVs',
+  sortNew: 'New CVs',
+  resultsZero: 'No candidates match these searches. Edit the filters or start a new search.',
+  pagesLabel: 'Result pages',
+  pageRange: (a: number, b: number, n: number) => `${fmtNum(a)}–${fmtNum(b)} of ${fmtNum(n)}`,
+  pageN: (p: number, total: number) => `Page ${fmtNum(p)} of ${fmtNum(total)}`,
+  prevPage: 'Previous',
+  nextPage: 'Next',
+  moreChips: (n: number) => `+${n} more`,
+
+  factAge: 'Age',
+  factSeniority: 'Seniority',
+  factEnglish: 'English',
+  factJapanese: 'Japanese',
+  /** Short language labels for the compact 3-column cards. */
+  factEnglishShort: 'EN',
+  factJapaneseShort: 'JP',
+  factGaishi: 'Gaishi score',
+  factSchool: 'School',
+  schoolWithRating: (school: string, r: SchoolRating) => (r === 'Overseas' ? school : `${school} (${r} rating)`),
+  previouslyAt: 'Previously at',
+  cardMeta: (c: Candidate) =>
+    `${plural(c.yearsExperience, 'year', 'years')} in ${en.industry[c.industry].toLowerCase()} · CV ${en.formatDate(c.cvUpdatedAt)}`,
+  openCv: 'Open CV',
+  openCvFor: (name: string) => `Open CV for ${name}`,
+
+  displayName: (c: Candidate) => `${c.firstName} ${c.lastName}`,
+  titleAt: (c: Candidate) => `${c.currentTitle}, ${c.currentCompany}`,
+  summary: (c: Candidate) => {
+    const overseas = c.yearsOverseas > 0 ? `${plural(c.yearsOverseas, 'year', 'years')} overseas` : 'no time overseas';
+    const foreign =
+      c.foreignCompanyCount > 0 ? plural(c.foreignCompanyCount, 'foreign company', 'foreign companies') : 'no foreign companies';
+    return `${plural(c.yearsExperience, 'year', 'years')} of experience in ${en.industry[c.industry].toLowerCase()}. ${en.level[c.englishLevel]} English, ${overseas}, ${foreign}. CV updated ${en.formatDate(c.cvUpdatedAt)}`;
+  },
+  formatDate: (iso: string) => {
+    const { y, m, d } = splitIso(iso);
+    return `${d} ${MONTHS_EN[m - 1]} ${y}`;
+  },
+
+  cvDialog: (name: string) => `CV of ${name}`,
+  cvProfile: 'Profile',
+  cvExperience: 'Experience',
+  cvEducation: 'Education',
+  cvLanguages: 'Languages',
+  close: 'Close',
+  toPresent: (y: number) => `${y} to present`,
+  yearRange: (a: number, b: number) => `${a} to ${b}`,
+  profileText: (c: Candidate) => {
+    const abroad = c.yearsOverseas > 0 ? `Lived overseas for ${plural(c.yearsOverseas, 'year', 'years')}.` : 'Has not lived overseas.';
+    return `${c.currentTitle} with ${plural(c.yearsExperience, 'year', 'years')} of experience in ${en.industry[c.industry].toLowerCase()}, working in ${en.position[c.position].toLowerCase()}. ${en.level[c.englishLevel]} English and ${en.level[c.japaneseLevel].toLowerCase()} Japanese. ${abroad}`;
+  },
+  /** One line per degree: "Master's, Engineering. Kyoto University (S rating). GPA 3.4 / 4.0." */
+  educationLine: (e: Education) =>
+    `${en.degree[e.degree]}${e.major ? `, ${en.major[e.major]}` : ''}. ${en.schoolWithRating(e.school, e.schoolRating)}.${e.gpa === null ? '' : ` GPA ${fmtGpa(e)}.`}`,
+  languagesText: (c: Candidate) =>
+    `Japanese: ${en.level[c.japaneseLevel]}${c.jlpt ? ` (JLPT ${c.jlpt})` : ''}. English: ${en.level[c.englishLevel]}${c.toeicScore ? ` (TOEIC ${c.toeicScore})` : ''}.`,
+  cvQualifications: 'Qualifications',
+
+  nameThisSearch: 'Name this search',
+  searchName: 'Search name',
+  cancel: 'Cancel',
+  save: 'Save',
+
+  chip: {
+    last: (v: string) => `Last name: ${v}`,
+    first: (v: string) => `First name: ${v}`,
+    current: (v: string) => `Now at: ${v}`,
+    previous: (v: string) => `Previously at: ${v}`,
+    gaishi: (v: string) => `Gaishi score ${v}`,
+    english: (l: Level, toeic: number | null) => `English: ${en.level[l]}+${toeic === null ? '' : ` (TOEIC ${toeic})`}`,
+    japanese: (l: Level, jlpt: Jlpt | null) => `Japanese: ${en.level[l]}+${jlpt ? ` (JLPT ${jlpt})` : ''}`,
+    foreign: (v: ForeignFilter) => `Foreign company: ${en.foreign[v]}`,
+    overseas: (v: OverseasFilter) => `Lived overseas: ${en.overseas[v]}`,
+    degree: (d: Degree, m: Major | undefined) => (m ? `${en.degree[d]}: ${en.major[m]}` : en.degree[d]),
+    schoolRating: (r: SchoolRating) => (r === 'Overseas' ? 'Overseas school' : `${r} rating`),
+    gpa: (v: number) => `GPA ${v.toFixed(1)}+`,
+    qualText: (v: string) => `Qualification: ${v}`,
+    school: (v: string) => `School: ${v}`,
+    none: 'No filters',
+  },
+
+  /** Words used to suggest a name for a saved search. */
+  nameParts: {
+    industry: {
+      technology: 'tech',
+      financial: 'finance sector',
+      healthcare: 'healthcare',
+      manufacturing: 'manufacturing',
+      consumer: 'consumer and retail',
+      telecoms: 'telecoms',
+      professional: 'professional services',
+      energy: 'energy sector',
+    } as Record<Industry, string>,
+    position: {
+      sales: 'sales',
+      marketing: 'marketing',
+      finance: 'finance',
+      hr: 'HR',
+      it: 'engineering',
+      legal: 'legal',
+      supply: 'supply chain',
+      gm: 'general management',
+    } as Record<Position, string>,
+    seniority: { S: 'staff', 'S+': 'senior staff', K: 'managers', B: 'department heads', Y: 'executives' } as Record<Seniority, string>,
+    people: 'candidates',
+    bilingual: 'Bilingual',
+    inTheir: (d: number) => `in their ${d}s`,
+    fallback: 'My search',
+    join: ' ',
+  },
+
+  /** Upload Resume and Dashboard pages (Resume Studio look, dummy data). */
+  studio: {
+    eyebrow: (user: string) => `Welcome back, ${user}`,
+    titleBefore: 'Give me a resume for ',
+    titleAccent: 'conversion',
+    titleAfter: '',
+    uploadTitle: 'Upload resume file or select a previous file from',
+    uploadLink: 'Dashboard',
+    uploadSub: 'Upload a resume to review and convert.',
+    dropTitle: 'Drop your resume here',
+    dropSub: 'or click to browse',
+    dropActive: 'Drop to add this file',
+    fileNote: (mb: number) => `Maximum file size: ${mb} MB · Processed on RW infrastructure`,
+    removeFile: 'Remove file',
+    errType: 'This file type is not supported. Use PDF, DOCX, DOC, XLSX, XLS or TXT.',
+    errSize: (mb: number) => `This file is larger than ${mb} MB.`,
+    start: 'Start conversion',
+    converting: 'Converting…',
+    done: (name: string) => `${name} is converted and listed on the dashboard.`,
+    doneReview: (name: string) => `${name} is converted and waiting for review on the dashboard.`,
+    viewDashboard: 'View on Dashboard',
+    settingsTitle: 'Conversion settings',
+    settingsSub:
+      'Select the source and output language. Same-language options keep the content in the original language; cross-language options translate the resume before export.',
+    pairHelp: {
+      'ja-ja': 'Keep a Japanese resume in Japanese.',
+      'en-en': 'Keep an English resume in English.',
+      'ja-en': 'Translate a Japanese resume to English.',
+      'en-ja': 'Translate an English resume to Japanese.',
+    } as Record<string, string>,
+    langShort: { ja: '日本語', en: 'EN' } as Record<'ja' | 'en', string>,
+    langCode: { ja: 'JA', en: 'EN' } as Record<'ja' | 'en', string>,
+    output: (lang: 'ja' | 'en') => `${lang === 'ja' ? 'Japanese' : 'English'} output`,
+    modeTitle: 'Conversion mode',
+    mode: { exact: 'Exact Wording', optimized: 'Optimized Mode' } as Record<'exact' | 'optimized', string>,
+    modeHelp: {
+      exact: "Keep the candidate's wording as close to the source as possible.",
+      optimized: 'Tidy the wording and structure into a clearer, recruiter-ready resume.',
+    } as Record<'exact' | 'optimized', string>,
+    engineTitle: 'Conversion engine',
+    engine: { standard: 'Standard', complex: 'Complex' } as Record<'standard' | 'complex', string>,
+    engineHelp: {
+      standard: 'The proven engine. Single- or dual-language files and table layouts are detected automatically.',
+      complex: 'For dense or unusual layouts: multi-column pages, nested tables and mixed languages. Slower.',
+    } as Record<'standard' | 'complex', string>,
+
+    dashTitle: 'Dashboard',
+    statTotal: 'Total (this page)',
+    statExported: 'Successful exports',
+    statReview: 'Awaiting review',
+    statCross: 'Cross-language',
+    listTitle: 'Conversions',
+    listMeta: (n: number, keep: number) => `${n} on this page · Auto-trimmed to last ${keep}`,
+    col: { num: '#', file: 'File', status: 'Status', by: 'Uploaded by', size: 'Size', created: 'Created' },
+    status: { exported: 'Exported', review: 'Awaiting review' } as Record<'exported' | 'review', string>,
+    you: (user: string) => `${user} (you)`,
+    tagSingle: 'Single Language',
+    tagDual: 'Dual Language',
+    tagTables: 'Has Tables',
+    tagNoTables: 'No Tables',
+    size: (kb: number) => `${kb.toFixed(1)} KB`,
+    created: (iso: string) => {
+      const d = new Date(iso);
+      const mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()];
+      return `${mon} ${String(d.getDate()).padStart(2, '0')} · ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    },
+    edit: 'Edit',
+    editFor: (name: string) => `Edit ${name}`,
+    deleteFor: (name: string) => `Delete ${name}`,
+    deleted: (name: string) => `${name} deleted.`,
+    undo: 'Undo',
+    empty: 'No conversions yet. Upload a resume to get started.',
+    uploadCta: 'Upload Resume',
+    detailTitle: (id: number) => `Conversion #${id}`,
+    detailNote: 'In Resume Studio, Edit opens the side-by-side editor. This prototype shows the conversion details only.',
+    detailLanguage: 'Languages',
+    detailFile: 'File',
+  },
+
+  /** Admin page (dummy users and activity; search settings really apply). */
+  admin: {
+    eyebrow: 'Robert Walters Japan · Workspace',
+    title: 'Admin',
+    statUsers: 'Users',
+    statActive: 'Active this week',
+    statInvites: 'Pending invites',
+    statConversions: 'Conversions on dashboard',
+    usersTitle: 'Users',
+    usersSub: 'Who can use Resume Studio and Resume Finder in this workspace.',
+    invite: 'Invite user',
+    inviteName: 'Name',
+    inviteEmail: 'Work email',
+    inviteRole: 'Role',
+    sendInvite: 'Send invite',
+    errName: 'Enter a name.',
+    errEmail: 'Enter a valid email address.',
+    errDuplicate: 'This email address is already in the list.',
+    invited: (name: string) => `Invite sent to ${name}.`,
+    role: { admin: 'Admin', recruiter: 'Recruiter', viewer: 'Viewer' } as Record<'admin' | 'recruiter' | 'viewer', string>,
+    status: { active: 'Active', invited: 'Invited', deactivated: 'Deactivated' } as Record<'active' | 'invited' | 'deactivated', string>,
+    you: '(you)',
+    lastActive: (when: string) => `Last active ${when}`,
+    neverActive: 'Not signed in yet',
+    deactivate: 'Deactivate',
+    activate: 'Activate',
+    resend: 'Resend invite',
+    roleFor: (name: string) => `Role for ${name}`,
+    removeUser: (name: string) => `Remove ${name}`,
+    settingsTitle: 'Search settings',
+    settingsSub: 'Changes apply to the Search page straight away.',
+    setting: { gender: 'Gender filter', jd: 'Start from a job description' } as Record<'gender' | 'jd', string>,
+    settingHelp: {
+      gender: 'Some countries do not allow filtering by gender. When off, the filter is hidden and ignored in every search.',
+      jd: 'Lets recruiters paste a job description to fill the filters.',
+    } as Record<'gender' | 'jd', string>,
+    defaultLang: 'Default language for new users',
+    langName: { en: 'English', ja: 'Japanese' } as Record<'en' | 'ja', string>,
+    demoTitle: 'Demo data',
+    demoSub: 'Put saved searches, dashboard conversions, users, settings and activity back to the sample data. Handy before a demo.',
+    reset: 'Reset demo data',
+    resetTitle: 'Reset demo data?',
+    resetBody: 'Saved searches, dashboard conversions, users, settings and activity go back to the sample data. Changes you made are lost.',
+    resetConfirm: 'Reset',
+    activityTitle: 'Recent activity',
+    activityEmpty: 'No activity yet.',
+    act: {
+      login: (a: string) => `${a} signed in`,
+      export: (a: string, b: string) => `${a} exported ${b}`,
+      search: (a: string, b: string) => `${a} saved the search “${b}”`,
+      invite: (a: string) => `Invited ${a}`,
+      resend: (a: string) => `Resent the invite to ${a}`,
+      role: (a: string, b: string) => `Changed ${a}'s role to ${b}`,
+      activate: (a: string) => `Activated ${a}`,
+      deactivate: (a: string) => `Deactivated ${a}`,
+      remove: (a: string) => `Removed ${a}`,
+      settingOn: (a: string) => `Turned on: ${a}`,
+      settingOff: (a: string) => `Turned off: ${a}`,
+      lang: (a: string) => `Default language set to ${a}`,
+      reset: 'Demo data reset',
+    },
+    ago: (iso: string) => {
+      const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
+      if (m < 1) return 'just now';
+      if (m < 60) return `${m} min ago`;
+      const h = Math.round(m / 60);
+      if (h < 24) return `${h} h ago`;
+      const d = Math.round(h / 24);
+      return d === 1 ? '1 day ago' : `${d} days ago`;
+    },
+  },
+
+  /** Assignment page: hand new resumes to recruiters and track their follow-up (prototype, sample data). */
+  assign: {
+    pageLabel: 'Assignment',
+    viewTitle: { individual: 'My assignments', team: 'Finance hiring team', global: 'All Robert Walters' } as Record<
+      AssignmentView,
+      string
+    >,
+    viewTag: { individual: 'Individual', team: 'Team', global: 'Global' } as Record<AssignmentView, string>,
+    viewSub: (v: AssignmentView, hours: number) =>
+      v === 'individual'
+        ? `Candidates assigned to you, newest first. Act within ${hours} hours or they return to the pool.`
+        : v === 'team'
+          ? "Your team's candidates, newest first."
+          : 'All new resumes from Candidate and the info@ inbox, newest first.',
+    countLabel: { individual: 'need action', team: 'not acted on', global: 'unassigned' } as Record<AssignmentView, string>,
+    countSub: (v: AssignmentView, recruiters: number) =>
+      v === 'individual'
+        ? 'assigned to you, not started'
+        : v === 'team'
+          ? `across ${recruiters} recruiters in your team`
+          : 'new resumes waiting in the pool',
+    viewHeading: 'View',
+    statusHeading: 'Status',
+    summary: { notActed: 'Not acted on', reassigned: 'Reassigned', inProgress: 'In progress', pool: 'Unassigned in pool' },
+    poolNote: (hours: number) => `Unattended assignments return to the pool after ${hours} hours.`,
+    status: {
+      notActed: 'Not acted on',
+      reassigned: 'Reassigned',
+      inProgress: 'In progress',
+      hired: 'Hired',
+      unassigned: 'Unassigned',
+    } as Record<AssignmentStatus, string>,
+    notActedFor: (days: number) => `Not acted on · ${days}d`,
+    notActedForLong: (days: number) => `Not acted on for ${plural(days, 'day', 'days')}`,
+    searchLabel: 'Search candidate or recruiter',
+    filterLabel: 'Show',
+    filter: { all: 'All', notActed: 'Not acted on', reassigned: 'Reassigned', unassigned: 'Unassigned' } as Record<
+      AssignmentFilter,
+      string
+    >,
+    tableLabel: 'Candidates',
+    col: {
+      candidate: 'Candidate (newest first)',
+      cv: 'CV',
+      recruiter: 'Recruiter',
+      reassign: 'Reassign',
+      schedule: 'Schedule',
+      progress: 'Progress',
+      status: 'Status',
+    },
+    received: (stamp: string) => {
+      const { m, d, time } = splitStamp(stamp);
+      return `Received ${d} ${MONTHS_EN[m - 1]}, ${time}`;
+    },
+    titleAt: (title: string, company: string) => `${title}, ${company}`,
+    name: (first: string, last: string) => `${first} ${last}`,
+    cv: 'CV',
+    cvFor: (name: string) => `Open CV for ${name}`,
+    assign: 'Assign',
+    assignFor: (name: string) => `Assign ${name}`,
+    reassign: 'Reassign',
+    reassignFor: (name: string) => `Reassign ${name}`,
+    schedule: 'Schedule',
+    scheduleFor: (name: string) => `Schedule a meeting with ${name}`,
+    you: 'You',
+    team: { finance: 'Finance hiring', technology: 'Technology' } as Record<TeamId, string>,
+    steps: { reachedOut: 'Reached out', met: 'Met', jobSent: 'Job sent', interview: 'Interview', hired: 'Hired' } as Record<
+      ProgressStep,
+      string
+    >,
+    progressFor: (name: string) => `Progress for ${name}`,
+    stepState: (done: boolean): string => (done ? 'done' : 'not started'),
+    legend: { red: 'Red: assigned but not acted on', orange: 'Orange: reassigned (wrong person)', green: 'Green: step done' },
+    showing: (from: number, to: number, total: number) => (from <= 1 ? `Showing ${to} of ${total}` : `Showing ${from}–${to} of ${total}`),
+    pagesLabel: 'Pages',
+    empty: 'No candidates match. Clear the search or pick another filter.',
+    showAll: 'Show all',
+
+    assignTo: (name: string) => `Assign ${name} to`,
+    recruiterLabel: 'Recruiter name or email',
+    recruiterPlaceholder: 'Type a name or email',
+    recruiterMeta: (email: string, team: string, open: number) => `${email} · ${team} · ${open} open`,
+    noRecruiter: 'No recruiter matches. Try another name or email.',
+    assignHint: 'Press Enter to assign. The recruiter gets an email straight away.',
+    assigned: (candidate: string, recruiter: string) => `${candidate} assigned to ${recruiter}`,
+
+    reassignTitle: (name: string) => `Reassign ${name}`,
+    reassignSub: (first: string) => `${first} goes back to the pool and the team lead is notified.`,
+    reason: 'Reason',
+    reasons: { busy: 'Too busy right now', wrong: 'Wrong assignment (not my area)', other: 'Other' } as Record<ReassignReason, string>,
+    suggest: 'Suggest someone (optional)',
+    suggestPlaceholder: "Type a recruiter's email",
+    suggestMatch: (name: string, team: string) => `Goes to ${name}, ${team}.`,
+    suggestNone: 'No recruiter with this email. Leave it empty to send the candidate back to the pool.',
+    reassignedPool: (name: string) => `${name} is back in the pool`,
+    reassignedTo: (name: string, recruiter: string) => `${name} reassigned to ${recruiter}`,
+
+    scheduleTitle: (name: string) => `Schedule a meeting with ${name}`,
+    scheduleSub: (first: string, recruiter: string) =>
+      `${first} gets an email with ${recruiter}'s open times, picks one, and both receive a calendar invite.`,
+    meetingType: 'Meeting type',
+    meeting: { video: 'Video call · 30 min', office: 'Office · 45 min', phone: 'Phone · 15 min' } as Record<MeetingType, string>,
+    openTimes: 'Open times',
+    day: (date: string) => {
+      const { y, m, d } = splitIso(date);
+      return `${WEEKDAYS_EN[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]} ${d} ${MONTHS_EN[m - 1]}`;
+    },
+    timesSelected: (n: number) =>
+      n === 0 ? 'Pick one or more times. Times shown in JST.' : `${n === 1 ? '1 time' : `${n} times`} selected. Times shown in JST.`,
+    sendTimes: (n: number, first: string) => (n === 0 ? `Send times to ${first}` : `Send ${n === 1 ? '1 time' : `${n} times`} to ${first}`),
+    timesSent: (first: string) => `Times sent to ${first}`,
+    footer: 'Prototype with sample data. Every candidate shown is invented.',
+  },
+
+  /** Analytics page: placeholder until the numbers are defined. */
+  analytics: {
+    title: 'Analytics',
+    badge: 'Coming soon',
+    body: 'Follow-up numbers for each recruiter and team will appear here: how fast new resumes are picked up, and how many reach an interview.',
+    cta: 'Open Assignment',
+  },
+
+  /** Full-screen search (first step) and split view (results, search within). */
+  showCandidates: 'Show candidates',
+  recentSearches: 'Recent searches',
+  noRecent: 'Searches you run appear here.',
+  showAllSaved: (n: number) => `Show all ${n}`,
+  allFilters: 'All filters',
+  allFiltersHint: 'Back to the full-screen search with every filter',
+  ageLabel: (a: number, b: number) => `Age ${a} to ${b}`,
+  ageFrom: 'From',
+  ageTo: 'to',
+  ageUnit: '',
+  gaishiBadge: (s: string) => `Gaishi score ${s}`,
+  openSavedTitle: 'Open saved search',
+  toastSaved: (name: string) => `Saved “${name}”`,
+  toastExported: (n: number) => `Exported ${fmtNum(n)} candidates`,
+  csv: {
+    name: 'Name',
+    title: 'Title',
+    company: 'Company',
+    industry: 'Industry',
+    cvUpdated: 'CV updated',
+    toeic: 'TOEIC',
+    jlpt: 'JLPT',
+    qualifications: 'Qualifications',
+  },
+
+  /** Menu bar under the top bar (like Word). */
+  menu: {
+    label: 'Menu',
+    file: 'File',
+    edit: 'Edit',
+    view: 'View',
+    help: 'Help',
+    newSearch: 'New search',
+    openSaved: 'Open saved search…',
+    save: 'Save',
+    saveAs: 'Save as…',
+    exportCsv: 'Export results (CSV)',
+    clearAll: 'Clear all filters',
+    undo: 'Undo last filter',
+    light: 'Light',
+    dark: 'Dark',
+    compact: 'Compact',
+    comfortable: 'Comfortable',
+    oneCol: '1-column results',
+    threeCol: '3-column results',
+    howTo: 'How to search',
+    shortcuts: 'Keyboard shortcuts',
+    about: 'About this prototype',
+  },
+  help: {
+    howTo: [
+      'Tick what the role needs. The count on the left updates with every click.',
+      'Choices in one row widen the search; different rows narrow it.',
+      'Press “Show candidates” to see the matching CVs.',
+      '“Search within these results” locks the list as a step, so you can add more filters on top.',
+      'Click a step in the trail to go back to it.',
+      'The small box beside each filter name means Required. Untick it to make that filter nice to have: nobody is left out, and candidates who match rank first under Best CVs.',
+    ],
+    shortcuts: [
+      ['Ctrl + Z', 'Undo the last filter change'],
+      ['Ctrl + S', 'Save the search'],
+      ['Esc', 'Close a menu, dialog or CV'],
+      ['← →  ↑ ↓', 'Move through the menu bar and menus'],
+    ] as [string, string][],
+  },
+
+  /** The small Required box beside each filter name. Unticked = nice to have. */
+  required: 'Required',
+  requiredFor: (label: string) => `${label}: required`,
+  requiredHint:
+    'Ticked: required, candidates must match. Untick to make it nice to have: nobody is left out, and candidates who match rank first.',
+  niceTag: 'nice to have',
+  prefMatch: (n: number, total: number) => `Matches ${n} of ${total} nice-to-haves`,
+  niceRanked: (n: number) => (n === 1 ? 'Ranked by 1 nice-to-have' : `Ranked by ${n} nice-to-haves`),
+
+  /** Language switch in the top bar: each language in its own script. */
+  langNames: { en: 'EN', ja: '日本語' } as Record<'en' | 'ja', string>,
+  csvFilePrefix: 'resume-finder',
+  loading: 'Loading…',
+  noCount: '—',
+  loadError: 'Could not load candidates. Check your connection and try again.',
+  retry: 'Try again',
+  errorTitle: 'Something went wrong',
+  errorBody: 'This page hit a problem it could not recover from. Your saved searches are safe.',
+  errorReload: 'Reload the page',
+  /** Shown when a typed number is outside its range (it is not applied). */
+  toeicRange: 'TOEIC is 10 to 990',
+  gpaRange: 'GPA is 0.1 to 4.0',
+  schoolNone: 'No education listed',
+
+  ageInvalid: 'Ages 20 to 69',
+  footer: 'Prototype with sample data. Every candidate, file and person shown is invented.',
+};
+
+export type Dict = typeof en;

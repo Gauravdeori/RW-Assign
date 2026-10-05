@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.vite/
+
+# Local design references (screenshots may contain real candidate file names) - never commit
+docs/reference/
