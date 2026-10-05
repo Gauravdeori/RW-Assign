@@ -11,6 +11,7 @@ import { AssignmentSidebar } from './AssignmentSidebar';
 import { AssignmentTable } from './AssignmentTable';
 import type { RowHandlers } from './AssignmentRow';
 import { AssignPopover } from './AssignPopover';
+import { ProgressPopover } from './ProgressPopover';
 import { ReassignDialog } from './ReassignDialog';
 import { ScheduleDialog } from './ScheduleDialog';
 import { FIELD, ROW_BTN, choice } from './styles';
@@ -38,6 +39,7 @@ export function AssignmentPage() {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
   const [assigning, setAssigning] = useState<{ id: string; anchor: HTMLElement } | null>(null);
+  const [editing, setEditing] = useState<{ id: string; anchor: HTMLElement } | null>(null);
   const [open, setOpen] = useState<Open>(null);
   const [toast, notify] = useToast();
 
@@ -58,6 +60,7 @@ export function AssignmentPage() {
 
   const byId = (id: string) => rows.find((a) => a.id === id);
   const assigningRow = assigning ? byId(assigning.id) : undefined;
+  const editingRow = editing ? byId(editing.id) : undefined;
   const openRow = open ? byId(open.id) : undefined;
   const openRecruiter = openRow?.recruiterId ? recruiters.get(openRow.recruiterId) : undefined;
 
@@ -65,6 +68,7 @@ export function AssignmentPage() {
     setView(v);
     setPage(0);
     setAssigning(null);
+    setEditing(null);
   }, []);
 
   const handlers = useMemo<RowHandlers>(
@@ -73,6 +77,7 @@ export function AssignmentPage() {
       onAssign: (id, anchor) => setAssigning((cur) => (cur?.id === id ? null : { id, anchor })),
       onReassign: (id) => setOpen({ kind: 'reassign', id }),
       onSchedule: (id) => setOpen({ kind: 'schedule', id }),
+      onProgress: (id, anchor) => setEditing((cur) => (cur?.id === id ? null : { id, anchor })),
     }),
     [],
   );
@@ -141,6 +146,7 @@ export function AssignmentPage() {
                 recruiters={recruiters}
                 you={view === 'individual' ? ME : null}
                 assigningId={assigning?.id ?? null}
+                progressId={editing?.id ?? null}
                 handlers={handlers}
                 onShowAll={() => {
                   setFilter('all');
@@ -212,6 +218,19 @@ export function AssignmentPage() {
         />
       )}
 
+      {editing && editingRow?.recruiterId && (
+        <ProgressPopover
+          anchor={editing.anchor}
+          a={editingRow}
+          onSteps={(n) => actions.setSteps(editingRow.id, n)}
+          onCount={(key, n) => actions.setCount(editingRow.id, key, n)}
+          onClose={(refocus) => {
+            setEditing(null);
+            if (refocus) editing.anchor.focus();
+          }}
+        />
+      )}
+
       {open?.kind === 'cv' && openRow && (
         <Suspense fallback={null}>
           <CvDrawer summary={openRow.cv} complete onClose={() => setOpen(null)} />
@@ -222,8 +241,8 @@ export function AssignmentPage() {
           candidate={openRow}
           recruiters={RECRUITERS}
           onClose={() => setOpen(null)}
-          onReassign={(_reason, to) => {
-            actions.reassign(openRow.id, to);
+          onReassign={(reason, to) => {
+            actions.reassign(openRow.id, to, reason);
             const name = t.assign.name(openRow.firstName, openRow.lastName);
             notify(to ? t.assign.reassignedTo(name, t.assign.name(to.firstName, to.lastName)) : t.assign.reassignedPool(name));
             setOpen(null);
@@ -235,9 +254,14 @@ export function AssignmentPage() {
           candidate={openRow}
           recruiter={openRecruiter}
           onClose={() => setOpen(null)}
-          onSend={() => {
-            actions.timesSent(openRow.id);
+          onSend={(meeting, times) => {
+            actions.timesSent(openRow.id, meeting, times);
             notify(t.assign.timesSent(openRow.firstName));
+            setOpen(null);
+          }}
+          onPick={(slot) => {
+            actions.pickTime(openRow.id, slot);
+            notify(t.assign.booked(openRow.firstName, t.assign.slot(slot)));
             setOpen(null);
           }}
         />

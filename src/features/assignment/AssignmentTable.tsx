@@ -17,6 +17,7 @@ export function AssignmentTable({
   recruiters,
   you,
   assigningId,
+  progressId,
   handlers,
   onShowAll,
 }: {
@@ -26,6 +27,8 @@ export function AssignmentTable({
   /** The signed-in recruiter, when their rows should say "You" (My assignments); null otherwise. */
   you: string | null;
   assigningId: string | null;
+  /** The row whose progress editor is open. */
+  progressId: string | null;
   handlers: RowHandlers;
   onShowAll: () => void;
 }) {
@@ -73,6 +76,7 @@ export function AssignmentTable({
                   recruiter={a.recruiterId ? recruiters.get(a.recruiterId) : undefined}
                   isYou={you !== null && a.recruiterId === you}
                   assignOpen={assigningId === a.id}
+                  progressOpen={progressId === a.id}
                   handlers={handlers}
                 />
               );

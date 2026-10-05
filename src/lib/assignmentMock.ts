@@ -4,8 +4,10 @@ import type {
   Industry,
   Level,
   Major,
+  Meeting,
   Position,
   PreviousCompany,
+  ReassignReason,
   Recruiter,
   SchoolRating,
   Seniority,
@@ -72,6 +74,8 @@ interface Seed {
   jobs?: number;
   interviews?: number;
   from?: string;
+  reason?: ReassignReason;
+  meeting?: Meeting;
   industry: Industry;
   position: Position;
   /** Japanese name (Japanese native, business English) or international (English native, business Japanese). */
@@ -87,6 +91,7 @@ const SEEDS: Seed[] = [
   {
     first: 'Sota',
     last: 'Nakamura',
+    meeting: { type: 'video', offered: ['2026-10-06T10:00', '2026-10-06T13:30', '2026-10-07T11:00'], picked: null },
     title: 'Financial Controller',
     company: 'Sony',
     received: '2026-10-05T18:42',
@@ -133,6 +138,7 @@ const SEEDS: Seed[] = [
     to: 'r2',
     assigned: '2026-10-05T12:10',
     from: 'r5',
+    reason: 'wrong',
     industry: 'financial',
     position: 'supply',
     jp: false,
@@ -300,6 +306,7 @@ const SEEDS: Seed[] = [
     to: 'r6',
     assigned: '2026-10-04T09:00',
     from: 'r3',
+    reason: 'busy',
     industry: 'financial',
     position: 'finance',
     jp: true,
@@ -379,6 +386,7 @@ const SEEDS: Seed[] = [
   {
     first: 'Riku',
     last: 'Ishikawa',
+    meeting: { type: 'office', offered: ['2026-10-06T16:00', '2026-10-07T09:30'], picked: '2026-10-07T09:30' },
     title: 'Software Engineer',
     company: 'Google Japan',
     received: '2026-10-05T15:10',
@@ -439,6 +447,7 @@ const SEEDS: Seed[] = [
     to: 'r7',
     assigned: '2026-10-03T10:00',
     from: 'r9',
+    reason: 'wrong',
     industry: 'technology',
     position: 'marketing',
     jp: false,
@@ -620,6 +629,8 @@ export function sampleAssignments(): Assignment[] {
     jobsSent: s.jobs ?? (s.steps && s.steps >= 3 ? 1 : 0),
     interviews: s.interviews ?? (s.steps && s.steps >= 4 ? 1 : 0),
     reassignedFrom: s.from ?? null,
+    reassignReason: s.reason ?? null,
+    meeting: s.meeting ?? null,
     cv: cvFor(s, i),
   }));
 }

@@ -38,8 +38,20 @@ export interface Assignment {
   interviews: number;
   /** Who handed it on (too busy, or it reached the wrong person). Shown orange until the next recruiter acts. */
   reassignedFrom: string | null;
+  /** Why it was handed on (shown on the orange row). */
+  reassignReason: ReassignReason | null;
+  /** Open times sent to the candidate, and the one they picked. */
+  meeting: Meeting | null;
   /** The CV shown in the preview drawer. */
   cv: Candidate;
+}
+
+export interface Meeting {
+  type: MeetingType;
+  /** The open times sent ('YYYY-MM-DDTHH:mm', Japan time). */
+  offered: string[];
+  /** The time the candidate picked; null while waiting for them. */
+  picked: string | null;
 }
 
 export type AssignmentStatus = 'notActed' | 'reassigned' | 'inProgress' | 'hired' | 'unassigned';

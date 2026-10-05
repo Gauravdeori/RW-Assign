@@ -7,7 +7,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 /** Symbols that may appear as text in JSX; every word goes through i18n (react/jsx-no-literals). */
-const ALLOWED_TEXT = ['×', '·', '→', '+', '★', '…', '‹', '›', ':', '/', '(', ')', '#'];
+const ALLOWED_TEXT = ['×', '·', '→', '+', '−', '★', '…', '‹', '›', ':', '/', '(', ')', '#'];
 
 export default tseslint.config(
   { ignores: ['dist', 'coverage', 'node_modules'] },

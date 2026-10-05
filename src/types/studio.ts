@@ -67,7 +67,14 @@ export type ActivityKind =
   | 'settingOn'
   | 'settingOff'
   | 'lang'
-  | 'reset';
+  | 'reset'
+  // Assignment page
+  | 'assign'
+  | 'reassign'
+  | 'reassignPool'
+  | 'timesSent'
+  | 'meetingBooked'
+  | 'progress';
 
 export interface Activity {
   id: string;

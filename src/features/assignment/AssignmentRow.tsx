@@ -5,6 +5,7 @@ import type { StatusInfo } from '../../lib/assignment';
 import { cx } from '../../lib/cx';
 import type { Assignment, Recruiter } from '../../types';
 import { Avatar } from './Avatar';
+import { CalendarIcon } from './CalendarIcon';
 import { ProgressSteps } from './ProgressSteps';
 import { StatusTag } from './StatusTag';
 import { ROW_BTN, ROW_PRIMARY_BTN } from './styles';
@@ -14,6 +15,7 @@ export interface RowHandlers {
   onAssign: (id: string, anchor: HTMLElement) => void;
   onReassign: (id: string) => void;
   onSchedule: (id: string) => void;
+  onProgress: (id: string, anchor: HTMLElement) => void;
 }
 
 /** Red and orange rows get a 4px bar on the left edge. */
@@ -29,6 +31,7 @@ export const AssignmentRow = memo(function AssignmentRow({
   recruiter,
   isYou,
   assignOpen,
+  progressOpen,
   handlers,
 }: {
   a: Assignment;
@@ -37,11 +40,24 @@ export const AssignmentRow = memo(function AssignmentRow({
   /** Show "You" under the recruiter's name (My assignments). */
   isYou: boolean;
   assignOpen: boolean;
+  progressOpen: boolean;
   handlers: RowHandlers;
 }) {
   const { t } = useI18n();
   const name = t.assign.name(a.firstName, a.lastName);
   const titleAt = t.assign.titleAt(a.title, a.company);
+  // Second line under the status: why it was handed on, or where the meeting stands.
+  const note =
+    status.kind === 'reassigned' && a.reassignReason
+      ? { text: t.assign.reasonShort[a.reassignReason], title: t.assign.reassignedBecause(t.assign.reasons[a.reassignReason]) }
+      : a.meeting?.picked
+        ? {
+            text: t.assign.slot(a.meeting.picked),
+            title: t.assign.bookedLine(t.assign.slot(a.meeting.picked), t.assign.meeting[a.meeting.type]),
+          }
+        : a.meeting
+          ? { text: t.assign.waiting(a.meeting.offered.length), title: t.assign.waitingLong(a.firstName, a.meeting.offered.length) }
+          : null;
   return (
     <tr className="border-t border-panel-line">
       <td className={cx('py-[7px] pr-2 pl-4', BAR[status.kind])}>
@@ -107,10 +123,23 @@ export const AssignmentRow = memo(function AssignmentRow({
         </button>
       </td>
       <td className="px-2">
-        <ProgressSteps name={name} stepsDone={a.stepsDone} jobsSent={a.jobsSent} interviews={a.interviews} />
+        <ProgressSteps
+          name={name}
+          stepsDone={a.stepsDone}
+          jobsSent={a.jobsSent}
+          interviews={a.interviews}
+          open={progressOpen}
+          onEdit={recruiter ? (anchor) => handlers.onProgress(a.id, anchor) : undefined}
+        />
       </td>
       <td className="px-2 pr-3">
         <StatusTag status={status} />
+        {note && (
+          <div className="mt-1 truncate text-[13px] leading-[17px] text-muted" title={note.title}>
+            {a.meeting?.picked && status.kind !== 'reassigned' && <CalendarIcon />}
+            {note.text}
+          </div>
+        )}
       </td>
     </tr>
   );

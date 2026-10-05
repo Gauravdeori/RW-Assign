@@ -14,6 +14,8 @@ export function describeActivity(x: Activity, a: Dict['admin']): string {
   switch (x.kind) {
     case 'export':
     case 'search':
+    case 'assign':
+    case 'reassign':
       return a.act[x.kind](x.a ?? '', x.b ?? '');
     case 'role':
       return a.act.role(x.a ?? '', isRole(x.b) ? a.role[x.b] : (x.b ?? ''));

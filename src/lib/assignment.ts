@@ -1,5 +1,15 @@
 import { CONFIG } from '../config';
-import type { Assignment, AssignmentFilter, AssignmentStatus, AssignmentView, Recruiter, TeamId } from '../types';
+import {
+  PROGRESS_STEPS,
+  type Assignment,
+  type AssignmentFilter,
+  type AssignmentStatus,
+  type AssignmentView,
+  type MeetingType,
+  type ReassignReason,
+  type Recruiter,
+  type TeamId,
+} from '../types';
 
 /**
  * Assignment page rules, kept free of React so they can be tested and later moved behind an API.
@@ -122,25 +132,62 @@ export const assignTo = (a: Assignment, r: Recruiter, now: string): Assignment =
   team: r.team,
   assignedAt: now,
   reassignedFrom: null,
+  reassignReason: null,
 });
 
 /**
  * Hand the candidate on: to the suggested recruiter, or back to the pool. The row turns orange; the next recruiter
- * starts from the first step.
+ * starts from the first step, with no meeting.
  */
-export const reassign = (a: Assignment, to: Recruiter | null, now: string): Assignment => ({
+export const reassign = (a: Assignment, to: Recruiter | null, reason: ReassignReason, now: string): Assignment => ({
   ...a,
   reassignedFrom: a.recruiterId ?? a.reassignedFrom,
+  reassignReason: reason,
   recruiterId: to?.id ?? null,
   team: to?.team ?? a.team,
   assignedAt: to ? now : null,
   stepsDone: 0,
   jobsSent: 0,
   interviews: 0,
+  meeting: null,
 });
 
-/** Open times sent to the candidate: that counts as reaching out. */
-export const timesSent = (a: Assignment): Assignment => ({ ...a, stepsDone: Math.max(a.stepsDone, 1) });
+/** Most jobs sent or interviews one candidate can be given in the counters. */
+export const MAX_COUNT = 99;
+
+/**
+ * Set how many steps are done. Steps never skip: ticking a step ticks the ones before it, unticking one unticks the
+ * ones after it. Job sent and Interview count at least 1 while done, and go back to 0 when undone.
+ */
+export function setSteps(a: Assignment, steps: number): Assignment {
+  const n = Math.max(0, Math.min(PROGRESS_STEPS.length, Math.round(steps)));
+  return {
+    ...a,
+    stepsDone: n,
+    jobsSent: n >= 3 ? Math.max(1, a.jobsSent) : 0,
+    interviews: n >= 4 ? Math.max(1, a.interviews) : 0,
+  };
+}
+
+/** Change the Job sent or Interview count (only while that step is done; between 1 and MAX_COUNT). */
+export function setCount(a: Assignment, key: 'jobsSent' | 'interviews', n: number): Assignment {
+  const needs = key === 'jobsSent' ? 3 : 4;
+  if (a.stepsDone < needs) return a;
+  return { ...a, [key]: Math.max(1, Math.min(MAX_COUNT, Math.round(n))) };
+}
+
+/** Open times sent to the candidate: that counts as reaching out. A new set replaces the last one. */
+export const timesSent = (a: Assignment, type: MeetingType, times: readonly string[]): Assignment => ({
+  ...a,
+  stepsDone: Math.max(a.stepsDone, 1),
+  meeting: { type, offered: [...times].sort(), picked: null },
+});
+
+/** The candidate picked one of the times sent: the meeting is booked. */
+export function pickTime(a: Assignment, slot: string): Assignment {
+  if (!a.meeting || !a.meeting.offered.includes(slot)) return a;
+  return { ...a, meeting: { ...a.meeting, picked: slot } };
+}
 
 /** The next `n` working days (Monday to Friday) after the day of `now`, as 'YYYY-MM-DD'. */
 export function nextWorkingDays(now: string, n: number): string[] {
@@ -159,3 +206,63 @@ export function nextWorkingDays(now: string, n: number): string[] {
 export const weekday = (date: string) => new Date(stampMinutes(date) * 60_000).getUTCDay();
 
 export const initials = (first: string, last: string) => `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();
+
+export interface RecruiterStats {
+  recruiter: Recruiter;
+  assigned: number;
+  open: number;
+  notActed: number;
+  /** Candidates this recruiter handed on (too busy, wrong person...). */
+  handedOn: number;
+  reachedOut: number;
+  interviews: number;
+  hired: number;
+}
+
+export interface Analytics {
+  total: number;
+  pool: number;
+  notActed: number;
+  interviews: number;
+  hired: number;
+  /** Assigned candidates, then how many of them reached each step (Reached out ... Hired). */
+  funnel: number[];
+  reasons: Record<ReassignReason, number>;
+  recruiters: RecruiterStats[];
+}
+
+/** Analytics page numbers, for one team or (team null) all of Robert Walters. */
+export function analyze(rows: readonly Assignment[], recruiters: readonly Recruiter[], team: TeamId | null, now: string): Analytics {
+  const scoped = team ? rows.filter((a) => a.team === team) : [...rows];
+  const assigned = scoped.filter((a) => a.recruiterId !== null);
+  const kinds = new Map(scoped.map((a) => [a.id, statusOf(a, now).kind]));
+  const reasons: Record<ReassignReason, number> = { busy: 0, wrong: 0, other: 0 };
+  for (const a of scoped) if (a.reassignedFrom !== null && a.reassignReason) reasons[a.reassignReason] += 1;
+  const sum = (list: readonly Assignment[], f: (a: Assignment) => number) => list.reduce((n, a) => n + f(a), 0);
+
+  return {
+    total: scoped.length,
+    pool: scoped.length - assigned.length,
+    notActed: scoped.filter((a) => kinds.get(a.id) === 'notActed').length,
+    interviews: sum(scoped, (a) => a.interviews),
+    hired: scoped.filter((a) => a.stepsDone >= PROGRESS_STEPS.length).length,
+    funnel: [assigned.length, ...PROGRESS_STEPS.map((_, i) => assigned.filter((a) => a.stepsDone > i).length)],
+    reasons,
+    recruiters: recruiters
+      .filter((r) => !team || r.team === team)
+      .map((r) => {
+        const mine = rows.filter((a) => a.recruiterId === r.id);
+        return {
+          recruiter: r,
+          assigned: mine.length,
+          open: openCount(r, rows),
+          notActed: mine.filter((a) => statusOf(a, now).kind === 'notActed').length,
+          handedOn: rows.filter((a) => a.reassignedFrom === r.id).length,
+          reachedOut: mine.filter((a) => a.stepsDone >= 1).length,
+          interviews: sum(mine, (a) => a.interviews),
+          hired: mine.filter((a) => a.stepsDone >= PROGRESS_STEPS.length).length,
+        };
+      })
+      .sort((x, y) => y.notActed - x.notActed || x.recruiter.lastName.localeCompare(y.recruiter.lastName)),
+  };
+}

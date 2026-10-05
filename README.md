@@ -55,6 +55,7 @@ src/
     describe.ts jdParser.ts exportCsv.ts   Chips and names, job description parser, CSV
     assignment.ts         Assignment page rules: status (red / orange / green), views, filters, search, assign, reassign
     assignmentMock.ts     Assignment page sample data: recruiters, ~30 candidates, open times, the demo clock
+    assignmentStore.ts    Assignment data shared by Assignment and Analytics, kept in this browser
   hooks/                useApiQuery, useLiveFilters, useFitBoxes, useDebouncedCommit, useToast, useTheme...
   components/           Shared UI, one component per file: Toggle, Segmented, Chip, CheckTile, FilterRow, Modal,
                         InfoPopover, ErrorBoundary, MenuBar, icons/...
@@ -66,7 +67,7 @@ src/
     upload/ dashboard/ admin/ studio/   Resume Studio pages and their shared pieces
     assignment/         Assignment page: sidebar (count, view switch, status), table and row, Assign box, Reassign and
                         Schedule dialogs, progress steps, status tag
-    analytics/          Analytics placeholder ("Coming soon")
+    analytics/          Analytics: totals, step funnel, reassign reasons and recruiters, from the Assignment data
   test/                 Test setup, fixtures and the main-flow test
 ```
 
@@ -109,9 +110,17 @@ Nothing in `components/` or `features/` needs to change. `parseJobDescription` i
 
 ## Assignment page (proof of concept)
 
-`#/assignment`, from the Assignment button in the top bar. UI only: sample data, no emails, no calendar invites.
-Assign, Reassign and Schedule change the page's own copy of the data instantly; leaving the page puts the sample data
-back.
+`#/assignment`, from the Assignment button in the top bar. No backend yet: sample data, no real emails or calendar
+invites. Everything else works, and changes are kept in this browser (they survive switching pages and reloading;
+Admin › Reset demo data puts the sample back). Every action is written to the Admin activity log.
+
+- Assign: type a recruiter's name or email under the Assign button, Enter.
+- Reassign: pick a reason (shown on the orange row), optionally name the next recruiter; otherwise back to the pool.
+- Schedule: send open times (meeting type kept); the row shows "3 times sent". When the candidate replies, open
+  Schedule again and record the time they picked; the row shows the booked meeting.
+- Progress: click a row's arrows to tick steps (always in order) and set the Job sent and Interview counts.
+- Analytics (`#/analytics`): totals, the step funnel, reassign reasons and a table per recruiter, for all of Robert
+  Walters or one team, counted live from the same data.
 
 - Three views share one table: My assignments (rows assigned to, or handed on by, Takeshi Kondo, the signed-in
   recruiter), Finance hiring team, and All Robert Walters (every new resume, including the pool).
@@ -122,8 +131,8 @@ back.
   whenever the demo runs. The return to the pool after 48 hours is shown as text only.
 - Every number on the page (count card, status counts, "4 open", "Showing 8 of 30") is counted from the sample rows, so
   they agree with the table and change as people assign and reassign.
-- To connect a backend: replace `sampleAssignments()`, `RECRUITERS` and `OPEN_TIMES` in `lib/assignmentMock.ts`, and call
-  the server from the three actions in `features/assignment/useAssignments.ts`. The rules in `lib/assignment.ts` and their
+- To connect a backend: replace `lib/assignmentStore.ts` (today it keeps the rows in this browser) and the sample data in
+  `lib/assignmentMock.ts`, and call the server from the actions in `features/assignment/useAssignments.ts`. The rules in `lib/assignment.ts` and their
   tests (`assignment.test.ts`) say what each status means.
 
 ## Search rules

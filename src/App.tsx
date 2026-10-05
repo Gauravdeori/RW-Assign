@@ -58,6 +58,8 @@ export default function App() {
                 resetSaved();
                 conversions.reset();
                 resetSettings();
+                // Loaded on demand, like the Assignment page (same module, so an open page updates too).
+                void import('./lib/assignmentStore').then((m) => m.resetAssignments());
               }}
             />
           ) : route === 'analytics' ? (
